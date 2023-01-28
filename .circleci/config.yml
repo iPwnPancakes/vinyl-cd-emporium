@@ -35,10 +35,31 @@ jobs:
                         - node_modules
             -   run: npm run build
 
+    build-and-deploy:
+        docker:
+            -   image: cimg/node:18.13
+        steps:
+            - checkout
+            - setup_remote_docker
+            -   run:
+                    name: Build Docker Image
+                    command: |
+                        npm ci --no-audit --prefer-offline
+                        npm run build
+                        docker build -t ipwnpancakes/vinyl-cd-emporium:latest .
+                        echo "$DOCKERHUB_ACCESS_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+                        docker push ipwnpancakes/vinyl-cd-emporium:latest
+
 workflows:
-    run-commit-tests:
+    test-and-build-and-deploy:
         jobs:
             - unit-test
-    compile-app:
-        jobs:
             - compile
+            -   build-and-deploy:
+                    requires:
+                        - unit-test
+                        - compile
+                    filters:
+                        branches:
+                            only:
+                                - master
