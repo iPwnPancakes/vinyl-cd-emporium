@@ -1,16 +1,25 @@
 version: 2.1
 
 jobs:
-  say-hello:
-    docker:
-      - image: cimg/base:stable
-    steps:
-      - checkout
-      - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+    unit-test:
+        docker:
+            -   image: cimg/node:18.13
+        steps:
+            - checkout
+            -   restore_cache:
+                    keys:
+                        - node-v1-{{ checksum "package-lock.json" }}
+                        - node-v1-
+            -   run: npm ci --no-audit --prefer-offline
+            -   save_cache:
+                    key: node-v1-{{ checksum "package-lock.json" }}
+                    paths:
+                        - node_modules
+            -   run:
+                    name: "Run Unit Tests"
+                    command: npm run test
 
 workflows:
-  say-hello-workflow:
-    jobs:
-      - say-hello
+    run-commit-tests:
+        jobs:
+            - unit-test
