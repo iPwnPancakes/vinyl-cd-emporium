@@ -35,30 +35,48 @@ jobs:
                         - node_modules
             -   run: npm run build
 
-    build-and-deploy:
+    build-and-push:
         docker:
             -   image: cimg/node:18.13
         steps:
             - checkout
             - setup_remote_docker
             -   run:
-                    name: Build Docker Image
+                    name: Install dependencies
+                    command: npm ci --no-audit --prefer-offline
+            -   run:
+                    name: Build application
+                    command: npm run build
+            -   run:
+                    name: Build Docker Image from current filesystem
                     command: |
-                        npm ci --no-audit --prefer-offline
-                        npm run build
                         docker build -t ipwnpancakes/vinyl-cd-emporium:latest .
                         echo "$DOCKERHUB_ACCESS_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
                         docker push ipwnpancakes/vinyl-cd-emporium:latest
+    deploy:
+        docker:
+            -   image: digitalocean/doctl:latest
+        steps:
+            -   run:
+                    name: "Trigger deployment"
+                    command: /app/doctl apps create-deployment "$DIGITAL_OCEAN_APP_ID" -t "$DIGITAL_OCEAN_ACCESS_TOKEN"
 
 workflows:
     test-and-build-and-deploy:
         jobs:
             - unit-test
             - compile
-            -   build-and-deploy:
+            -   build-and-push:
                     requires:
                         - unit-test
                         - compile
+                    filters:
+                        branches:
+                            only:
+                                - master
+            -   deploy:
+                    requires:
+                        - build-and-push
                     filters:
                         branches:
                             only:
